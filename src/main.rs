@@ -3,7 +3,7 @@ mod schema;
 
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    EmptyMutation, EmptySubscription, Error, ErrorExtensions, Response, ServerError,
+    EmptyMutation, EmptySubscription, Response, 
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
@@ -13,8 +13,8 @@ use axum::{
     routing::get,
     Router,
 };
-use schema::{QueryRoot, Schema};
 
+use schema::{QueryRoot, Schema};
 use auth::authenticate;
 
 async fn graphql_handler(
