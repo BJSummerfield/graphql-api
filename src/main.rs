@@ -26,8 +26,19 @@ async fn graphql_handler(
         req = req.data(user);
         schema.execute(req).await.into()
     } else {
-        let error = ServerError::new("Unauthorized", None);
-        let response = Response::from_errors(vec![error]);
+        let error = Error::new("Unauthorized")
+            .extend_with(|_, e| e.set("status", 401))
+            .extend_with(|_, e| e.set("code", "UNAUTHORIZED"));
+
+        let server_error = ServerError {
+            message: error.message,
+            source: error.source,
+            locations: Vec::new(),
+            path: Vec::new(),
+            extensions: error.extensions,
+        };
+
+        let response = Response::from_errors(vec![server_error]);
         GraphQLResponse::from(response)
     }
 }
