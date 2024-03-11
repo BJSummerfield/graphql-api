@@ -1,4 +1,4 @@
-use crate::schema::User;
+use crate::models::User;
 use async_graphql::{Error, ErrorExtensions, ServerError};
 
 #[derive(Debug)]
