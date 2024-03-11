@@ -1,6 +1,3 @@
-mod auth;
-mod schema;
-
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig, ALL_WEBSOCKET_PROTOCOLS},
     EmptyMutation, Schema,
@@ -14,8 +11,12 @@ use axum::{
     Router,
 };
 
-use auth::authenticate;
-use schema::{on_connection_init, QueryRoot, SchemaType, SubscriptionRoot};
+mod auth;
+mod graphql;
+mod models;
+
+use auth::{authenticate, create_unauthorized_error};
+use graphql::{on_connection_init, QueryRoot, SchemaType, SubscriptionRoot};
 
 async fn graphql_handler(
     State(schema): State<SchemaType>,
@@ -23,16 +24,21 @@ async fn graphql_handler(
     req: GraphQLRequest,
 ) -> GraphQLResponse {
     let mut req = req.into_inner();
-    match authenticate(&headers) {
-        Ok(user) => {
-            println!("User: {:?}", user);
-            req = req.data(user);
-            schema.execute(req).await.into()
+    if let Some(auth_header) = headers.get("Authorization") {
+        match authenticate(auth_header.to_str().unwrap()) {
+            Ok(user) => {
+                println!("User: {:?}", user);
+                req = req.data(user);
+                schema.execute(req).await.into()
+            }
+            Err(error) => {
+                let response = async_graphql::Response::from_errors(vec![error]);
+                GraphQLResponse::from(response)
+            }
         }
-        Err(error) => {
-            let response = async_graphql::Response::from_errors(vec![error]);
-            GraphQLResponse::from(response)
-        }
+    } else {
+        let response = async_graphql::Response::from_errors(vec![create_unauthorized_error()]);
+        GraphQLResponse::from(response)
     }
 }
 
