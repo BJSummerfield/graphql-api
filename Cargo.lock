@@ -520,6 +520,9 @@ dependencies = [
  "async-graphql",
  "async-graphql-axum",
  "axum",
+ "futures-util",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
