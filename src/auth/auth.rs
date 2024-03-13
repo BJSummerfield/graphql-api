@@ -1,3 +1,4 @@
+use crate::auth::TokenValidator;
 use crate::graphql::SchemaType;
 use crate::models::User;
 use async_graphql::{Data, Error, ErrorExtensions, Result, ServerError};
@@ -11,16 +12,24 @@ struct Payload {
     authorization: String,
 }
 
-pub struct Auth;
+#[derive(Clone)]
+pub struct Auth {
+    token_validator: TokenValidator,
+}
 
 impl Auth {
+    pub fn new(token_validator: TokenValidator) -> Self {
+        Self { token_validator }
+    }
+
     pub async fn http(
+        &self,
         State(schema): State<SchemaType>,
         req: GraphQLRequest,
         headers: HeaderMap,
     ) -> GraphQLResponse {
         match Self::extract_token(&headers) {
-            Some(token) => Self::process_request_with_token(schema, req, token).await,
+            Some(token) => self.process_request_with_token(schema, req, token).await,
             None => Self::unauthorized_response(),
         }
     }
@@ -31,17 +40,21 @@ impl Auth {
             .map(|value| value.to_str().unwrap().to_string())
     }
 
-    async fn process_request_with_token(
+    pub async fn process_request_with_token(
+        &self,
         schema: SchemaType,
         req: GraphQLRequest,
         token: String,
     ) -> GraphQLResponse {
-        match Self::authenticate(token) {
+        match self.token_validator.validate_token(&token).await {
             Ok(user) => {
                 let req = req.into_inner().data(user);
                 schema.execute(req).await.into()
             }
-            Err(error) => GraphQLResponse::from(async_graphql::Response::from_errors(vec![error])),
+            // Err(error) => GraphQLResponse::from(async_graphql::Response::from_errors(vec![error])),
+            Err(..) => GraphQLResponse::from(async_graphql::Response::from_errors(vec![
+                Self::create_unauthorized_error(),
+            ])),
         }
     }
 
@@ -65,7 +78,7 @@ impl Auth {
         token == "validToken"
     }
 
-    pub async fn on_connection_init(value: serde_json::Value) -> Result<Data> {
+    pub async fn on_connection_init(self, value: serde_json::Value) -> Result<Data> {
         if let Ok(payload) = serde_json::from_value::<Payload>(value) {
             match Self::authenticate(payload.authorization) {
                 Ok(user) => {
