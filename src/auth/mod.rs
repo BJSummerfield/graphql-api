@@ -1,3 +1,3 @@
-mod token;
+mod auth;
 
-pub use token::{authenticate, create_unauthorized_error};
+pub use auth::Auth;

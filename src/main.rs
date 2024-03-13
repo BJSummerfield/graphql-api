@@ -15,31 +15,15 @@ mod auth;
 mod graphql;
 mod models;
 
-use auth::{authenticate, create_unauthorized_error};
-use graphql::{on_connection_init, QueryRoot, SchemaType, SubscriptionRoot};
+use auth::Auth;
+use graphql::{QueryRoot, SchemaType, SubscriptionRoot};
 
 async fn graphql_handler(
     State(schema): State<SchemaType>,
     headers: HeaderMap,
     req: GraphQLRequest,
 ) -> GraphQLResponse {
-    let mut req = req.into_inner();
-    if let Some(auth_header) = headers.get("Authorization") {
-        match authenticate(auth_header.to_str().unwrap()) {
-            Ok(user) => {
-                println!("User: {:?}", user);
-                req = req.data(user);
-                schema.execute(req).await.into()
-            }
-            Err(error) => {
-                let response = async_graphql::Response::from_errors(vec![error]);
-                GraphQLResponse::from(response)
-            }
-        }
-    } else {
-        let response = async_graphql::Response::from_errors(vec![create_unauthorized_error()]);
-        GraphQLResponse::from(response)
-    }
+    Auth::http(State(schema), req, headers).await
 }
 
 async fn graphql_ws_handler(
@@ -47,12 +31,11 @@ async fn graphql_ws_handler(
     protocol: GraphQLProtocol,
     websocket: WebSocketUpgrade,
 ) -> Response {
-    println!("Websocket connection initiated!");
     websocket
         .protocols(ALL_WEBSOCKET_PROTOCOLS)
         .on_upgrade(move |stream| {
             GraphQLWebSocket::new(stream, schema.clone(), protocol)
-                .on_connection_init(on_connection_init)
+                .on_connection_init(Auth::on_connection_init)
                 .serve()
         })
 }
