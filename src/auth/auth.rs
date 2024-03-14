@@ -14,7 +14,7 @@ struct Payload {
 
 #[derive(Clone)]
 pub struct Auth {
-    token_validator: TokenValidator,
+    pub token_validator: TokenValidator,
 }
 
 impl Auth {
@@ -52,9 +52,12 @@ impl Auth {
                 schema.execute(req).await.into()
             }
             // Err(error) => GraphQLResponse::from(async_graphql::Response::from_errors(vec![error])),
-            Err(..) => GraphQLResponse::from(async_graphql::Response::from_errors(vec![
-                Self::create_unauthorized_error(),
-            ])),
+            Err(error) => {
+                println!("Error: {:?}", error);
+                GraphQLResponse::from(async_graphql::Response::from_errors(vec![
+                    Self::create_unauthorized_error(),
+                ]))
+            }
         }
     }
 

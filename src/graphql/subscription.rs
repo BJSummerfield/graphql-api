@@ -11,6 +11,6 @@ impl SubscriptionRoot {
         ctx: &'ctx Context<'_>,
     ) -> Result<impl Stream<Item = String> + 'ctx> {
         let user = ctx.data::<User>()?;
-        Ok(futures_util::stream::once(async move { user.name.clone() }))
+        Ok(futures_util::stream::once(async move { user.upn.clone() }))
     }
 }
