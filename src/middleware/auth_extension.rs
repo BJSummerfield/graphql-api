@@ -1,5 +1,5 @@
 use crate::auth::Token;
-use crate::models::User;
+use crate::auth::TokenValidator;
 
 use async_graphql::{
     extensions::{Extension, ExtensionContext, ExtensionFactory, NextPrepareRequest},
@@ -18,16 +18,28 @@ impl Extension for AuthExtension {
         next: NextPrepareRequest<'_>,
     ) -> ServerResult<Request> {
         if let Some(token_str) = ctx.data_opt::<Token>().map(|token| &token.0) {
-            if token_str == "validToken" {
-                let token = Token(token_str.clone());
-                let user = User {
-                    id: "1".to_string(),
-                    upn: "billy@yahoo.com".to_string(),
-                };
+            if true {
+                match ctx.data::<TokenValidator>() {
+                    Ok(token_validator) => {
+                        let user_result = token_validator.validate_token(token_str).await;
 
-                request = request.data(token).data(user);
-
-                next.run(ctx, request).await
+                        match user_result {
+                            Ok(user) => {
+                                let token = Token(token_str.clone());
+                                request = request.data(token).data(user);
+                                next.run(ctx, request).await
+                            }
+                            Err(err) => {
+                                println!("Invalid token: {}", err);
+                                Err(create_unauthorized_error("Invalid Token"))
+                            }
+                        }
+                    }
+                    Err(_err) => {
+                        println!("Failed to get TokenValidator");
+                        Err(create_unauthorized_error("Internal Server Error"))
+                    }
+                }
             } else {
                 println!("Invalid token");
                 Err(create_unauthorized_error("Invalid Token"))

@@ -3,7 +3,8 @@ use jsonwebtoken::jwk::{AlgorithmParameters, Jwk, JwkSet};
 use jsonwebtoken::{decode, decode_header, DecodingKey, Header, Validation};
 use reqwest;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -36,7 +37,6 @@ impl TokenValidator {
     }
 
     pub async fn validate_token(&self, token: &str) -> Result<User, String> {
-        println!("Validating token: {:?}", self.metadata_urls_jwks);
         let header =
             decode_header(token).map_err(|_| "Failed to decode token header".to_string())?;
         let kid = header
@@ -44,16 +44,19 @@ impl TokenValidator {
             .clone()
             .ok_or("Missing kid in token header".to_string())?;
 
-        let mut metadata_urls_jwks = self.metadata_urls_jwks.lock().unwrap();
+        let mut metadata_urls_jwks = self.metadata_urls_jwks.lock().await;
 
         for (metadata_url, jwks) in metadata_urls_jwks.iter_mut() {
             if let Some(jwk) = jwks.find(&kid) {
+                println!("Found jwk in cache for kid: {}", kid);
                 return self.validate_token_with_jwk(token, &header, jwk);
             } else {
+                println!("JWK not found in cache for kid: {}", kid);
                 let refreshed_jwks = Self::fetch_jwks(metadata_url).await?;
                 *jwks = refreshed_jwks;
 
                 if let Some(jwk) = jwks.find(&kid) {
+                    println!("Found jwk in refreshed cache for kid: {}", kid);
                     return self.validate_token_with_jwk(token, &header, jwk);
                 }
             }
@@ -89,6 +92,7 @@ impl TokenValidator {
     }
 
     async fn fetch_jwks(metadata_url: &str) -> Result<JwkSet, String> {
+        println!("Fetching JWKS from {}", metadata_url);
         let response = reqwest::get(metadata_url)
             .await
             .map_err(|_| "Failed to fetch metadata".to_string())?;

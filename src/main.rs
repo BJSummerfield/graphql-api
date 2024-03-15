@@ -17,7 +17,7 @@ mod graphql;
 mod middleware;
 mod models;
 
-use auth::Auth;
+use auth::{Auth, TokenValidator};
 use graphql::{QueryRoot, SchemaType, SubscriptionRoot};
 use middleware::AuthExtension;
 
@@ -57,7 +57,9 @@ async fn graphql_playground() -> impl IntoResponse {
 #[tokio::main]
 async fn main() {
     let auth_extension = AuthExtension;
+
     let schema = Schema::build(QueryRoot, EmptyMutation, SubscriptionRoot)
+        .data(TokenValidator::new())
         .extension(auth_extension)
         .finish();
 
