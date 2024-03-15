@@ -1,4 +1,4 @@
 use super::{QueryRoot, SubscriptionRoot};
-use async_graphql::{EmptyMutation, Schema};
+use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 
-pub type SchemaType = Schema<QueryRoot, EmptyMutation, SubscriptionRoot>;
+pub type SchemaType = Schema<QueryRoot, EmptyMutation, EmptySubscription>;

@@ -14,3 +14,4 @@ impl QueryRoot {
         Ok(format!("Welcome, {}!", user.upn))
     }
 }
+pub struct Token(pub String);
