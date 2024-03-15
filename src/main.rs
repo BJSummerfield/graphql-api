@@ -1,6 +1,6 @@
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig, ALL_WEBSOCKET_PROTOCOLS},
-    EmptyMutation, EmptySubscription, Schema,
+    EmptyMutation, Schema,
 };
 use async_graphql_axum::{GraphQLProtocol, GraphQLRequest, GraphQLResponse, GraphQLWebSocket};
 use axum::{
@@ -8,7 +8,7 @@ use axum::{
     extract::{State, WebSocketUpgrade},
     http::header::HeaderMap,
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
     Router,
 };
 
@@ -19,7 +19,7 @@ mod models;
 
 use auth::Auth;
 use graphql::{QueryRoot, SchemaType, SubscriptionRoot};
-use middleware::{AuthExtension, Token};
+use middleware::AuthExtension;
 
 #[debug_handler]
 async fn graphql_handler(
@@ -28,18 +28,10 @@ async fn graphql_handler(
     req: GraphQLRequest,
 ) -> GraphQLResponse {
     let mut req = req.into_inner();
-    if let Some(token) = get_token_from_headers(&headers) {
-        println!("Token: {:?}", token.0);
+    if let Some(token) = Auth::get_token_from_headers(&headers) {
         req = req.data(token);
     }
     schema.execute(req).await.into()
-}
-
-fn get_token_from_headers(headers: &HeaderMap) -> Option<Token> {
-    println!("get_token_from_headers");
-    headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().map(|s| Token(s.to_string())).ok())
 }
 
 async fn graphql_ws_handler(
@@ -57,22 +49,23 @@ async fn graphql_ws_handler(
 }
 
 async fn graphql_playground() -> impl IntoResponse {
-    Html(playground_source(GraphQLPlaygroundConfig::new("/")))
+    Html(playground_source(
+        GraphQLPlaygroundConfig::new("/").subscription_endpoint("/ws"),
+    ))
 }
 
 #[tokio::main]
 async fn main() {
-    println!("Starting server...");
     let auth_extension = AuthExtension;
-    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+    let schema = Schema::build(QueryRoot, EmptyMutation, SubscriptionRoot)
         .extension(auth_extension)
         .finish();
 
-    // let auth_middleware_layer = ServiceBuilder::new().layer_fn(|inner| AuthMiddleware::new(inner));
-
     let app = Router::new()
         .route("/", get(graphql_playground).post(graphql_handler))
-        .with_state(schema); // .route("/ws", get(graphql_ws_handler))
+        .with_state(schema.clone())
+        .route("/ws", get(graphql_ws_handler))
+        .with_state(schema);
 
     println!("GraphQL playground: http://localhost:3000");
 

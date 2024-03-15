@@ -1,3 +1,4 @@
+use crate::auth::Token;
 use crate::models::User;
 
 use async_graphql::{
@@ -6,8 +7,6 @@ use async_graphql::{
 };
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct Token(pub String);
 pub struct AuthExtension;
 
 #[async_trait::async_trait]
@@ -18,38 +17,23 @@ impl Extension for AuthExtension {
         mut request: Request,
         next: NextPrepareRequest<'_>,
     ) -> ServerResult<Request> {
-        println!("AuthExtension::prepare_request");
-        // Here, extract the token from HTTP headers, which should have been added to the request data
-        // For the purpose of this example, let's assume the token is directly available
-        // This part might need to be adjusted based on your actual token extraction logic
-        // let user = ctx.data_unchecked::<User>();
-        println!(
-            "{:?}",
-            ctx.data_opt::<Token>().map(|token| token.0.as_str())
-        );
-        if let Some(token_str) = ctx.data_opt::<Token>().map(|token| token.0.clone()) {
-            // Validate the token and create a user object
-            // Here, insert your token validation logic
+        if let Some(token_str) = ctx.data_opt::<Token>().map(|token| &token.0) {
             if token_str == "validToken" {
-                let token = Token(token_str.clone()); // Create your Token struct
+                let token = Token(token_str.clone());
                 let user = User {
                     id: "1".to_string(),
                     upn: "billy@yahoo.com".to_string(),
                 };
 
-                // Modify the request to include both the Token and User
                 request = request.data(token).data(user);
 
-                // Proceed with the modified request
                 next.run(ctx, request).await
             } else {
                 println!("Invalid token");
-                // If the token is invalid, return an error.
-                Err(create_unauthorized_error("Unauthorized"))
+                Err(create_unauthorized_error("Invalid Token"))
             }
         } else {
             println!("No token provided");
-            // If no token is provided, return an error.
             Err(create_unauthorized_error("No Token Provided"))
         }
     }
