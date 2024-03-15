@@ -48,15 +48,12 @@ impl TokenValidator {
 
         for (metadata_url, jwks) in metadata_urls_jwks.iter_mut() {
             if let Some(jwk) = jwks.find(&kid) {
-                println!("Found jwk in cache for kid: {}", kid);
                 return self.validate_token_with_jwk(token, &header, jwk);
             } else {
-                println!("JWK not found in cache for kid: {}", kid);
                 let refreshed_jwks = Self::fetch_jwks(metadata_url).await?;
                 *jwks = refreshed_jwks;
 
                 if let Some(jwk) = jwks.find(&kid) {
-                    println!("Found jwk in refreshed cache for kid: {}", kid);
                     return self.validate_token_with_jwk(token, &header, jwk);
                 }
             }
@@ -92,7 +89,6 @@ impl TokenValidator {
     }
 
     async fn fetch_jwks(metadata_url: &str) -> Result<JwkSet, String> {
-        println!("Fetching JWKS from {}", metadata_url);
         let response = reqwest::get(metadata_url)
             .await
             .map_err(|_| "Failed to fetch metadata".to_string())?;
